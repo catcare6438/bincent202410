@@ -3,536 +3,578 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>流浪動物之家中途空間 - 貓咪檔案管理系統</title>
-    <!-- 引入 Tailwind CSS 進行精美排版 -->
+    <title>浪貓不浪 - 浪愛定格，尋找溫暖的家</title>
+    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- 引入 FontAwesome 圖標 -->
+    <!-- 載入 FontAwesome 圖標 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* 隱藏原生檔案上傳按鈕 */
-        .file-input-hide {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-    </style>
+    <!-- 載入 Supabase 官方 UMD JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen pb-12">
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans pb-16">
 
-    <!-- 頂部導覽列與模式切換 -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
-                <div class="bg-pink-500 text-white p-2.5 rounded-2xl shadow-md shadow-pink-200">
-                    <i class="fa-solid fa-cat text-2xl"></i>
-                </div>
+    <!-- 頂部導覽列 -->
+    <header class="bg-white border-b border-slate-100 shadow-xs sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2.5 cursor-pointer" onclick="showView('gallery-view')">
+                <div class="bg-orange-500 text-white p-2 rounded-xl"><i class="fa-solid fa-cat text-xl"></i></div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-wide text-slate-800">幸福中途空間</h1>
-                    <p class="text-xs text-slate-500">浪愛定格 · 尋找一個永遠的家</p>
+                    <h1 class="text-lg font-bold tracking-wide">浪貓不浪</h1>
+                    <p class="text-[10px] text-slate-400">流浪動物中途寵物空間</p>
                 </div>
             </div>
             
-            <!-- 模式切換按鈕 (優化測試體驗) -->
-            <div class="bg-slate-100 p-1 rounded-xl flex border border-slate-200">
-                <button id="btn-admin" onclick="switchMode('admin')" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center gap-2">
-                    <i class="fa-solid fa-pen-to-square"></i> 管理者模式 (編輯)
+            <!-- 上方切換登入按鈕 -->
+            <div class="flex items-center gap-2">
+                <button onclick="openModal('owner-login-modal')" class="px-3.5 py-1.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-medium hover:bg-slate-50 transition-colors">
+                    <i class="fa-solid fa-house-user mr-1 text-orange-500"></i>飼主登入
                 </button>
-                <button id="btn-visitor" onclick="switchMode('visitor')" class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-600 hover:text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-eye"></i> 訪客模式 (精簡看貓)
+                <button onclick="openModal('backend-login-modal')" class="px-3.5 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-medium hover:bg-slate-800 transition-colors">
+                    <i class="fa-solid fa-screwdriver-wrench mr-1"></i>後台登入
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- 主體內容區塊 -->
-    <main class="max-w-7xl mx-auto px-4 mt-8">
+    <!-- 頁面主要容器 -->
+    <main class="max-w-6xl mx-auto px-4 mt-8">
         
-        <!-- 提示區塊 -->
-        <div id="mode-tip" class="mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3 text-sm">
-            <i class="fa-solid fa-circle-info text-base shrink-0"></i>
-            <span><strong>當前為【管理者模式】：</strong> 您可以自由填寫、勾選以下欄位並上傳生活照。點擊上方可切換為【訪客模式】觀看最終呈現效果（未勾選項目會自動隱藏）。</span>
+        <!-- 分頁標籤列 (訪客大廳 / 幸福分享區) -->
+        <div class="flex border-b border-slate-200 mb-6 gap-6 text-sm font-medium">
+            <button id="tab-gallery" onclick="switchMainTab('gallery')" class="pb-3 border-b-2 border-orange-500 text-orange-600">中途貓咪大廳</button>
+            <button id="tab-happy" onclick="switchMainTab('happy')" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800">找到幸福貓咪分享區</button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- 左側：核心資料卡片 (主欄位 + 基本醫療) -->
-            <div class="lg:col-span-5 space-y-6">
-                
-                <!-- 區塊一：主欄位卡片 -->
-                <section class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md">
-                    <div class="p-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white">
-                        <h2 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-id-card"></i> 貓咪主檔案</h2>
-                        <p class="text-xs opacity-80 mt-0.5">核心識別資訊與入所時間</p>
-                    </div>
-                    
-                    <div class="p-6 space-y-5">
-                        <!-- 照片上傳區 -->
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">大頭照分享</label>
-                            <div class="relative group border-2 border-dashed border-slate-300 rounded-2xl h-48 bg-slate-50 flex flex-col justify-center items-center overflow-hidden transition-colors hover:border-pink-400">
-                                <img id="main-avatar-preview" class="w-full h-full object-cover hidden" />
-                                <div id="main-avatar-placeholder" class="text-center p-4">
-                                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 group-hover:text-pink-500 transition-colors mb-2"></i>
-                                    <p class="text-sm font-medium text-slate-600">點擊上傳或拖曳照片</p>
-                                    <p class="text-xs text-slate-400 mt-1">支援 JPG, PNG 格式</p>
-                                </div>
-                                <input type="file" accept="image/*" onchange="previewMainAvatar(this)" class="file-input-hide admin-field">
-                            </div>
-                        </div>
+        <!-- 狀態回饋區域 -->
+        <div id="current-role-badge" class="hidden mb-4 bg-orange-50 border border-orange-100 text-orange-800 px-4 py-2.5 rounded-xl text-xs flex justify-between items-center">
+            <span>當前身分：<strong id="role-text">訪客</strong></span>
+            <button onclick="logoutRole()" class="text-red-500 hover:underline font-bold">登出身分</button>
+        </div>
 
-                        <!-- 名字與性別 -->
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1.5">貓咪名字</label>
-                                <input type="text" id="cat-name" value="咪咪" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 admin-field font-medium">
-                                <p id="view-cat-name" class="hidden text-xl font-bold text-slate-800"></p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1.5">性別</label>
-                                <div class="admin-field flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-                                    <label class="flex-1 text-center py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-all has-[:checked]:bg-white has-[:checked]:text-blue-600 has-[:checked]:shadow-xs">
-                                        <input type="radio" name="gender" value="公" checked class="sr-only"> 帥哥 (公)
-                                    </label>
-                                    <label class="flex-1 text-center py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-all has-[:checked]:bg-white has-[:checked]:text-pink-600 has-[:checked]:shadow-xs">
-                                        <input type="radio" name="gender" value="母" class="sr-only"> 美女 (母)
-                                    </label>
-                                </div>
-                                <p id="view-gender" class="hidden text-sm mt-2 font-medium"></p>
-                            </div>
-                        </div>
-
-                        <!-- 日期時間 -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1.5">何時進入中途</label>
-                                <input type="date" id="date-join" value="2026-01-15" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 admin-field">
-                                <div id="view-date-join" class="hidden text-slate-600 text-sm flex items-center gap-2"><i class="fa-regular fa-calendar text-slate-400"></i> <span></span></div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-slate-700 mb-1.5">何時找到家</label>
-                                <input type="date" id="date-home" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 admin-field">
-                                <div id="view-date-home" class="hidden text-slate-600 text-sm flex items-center gap-2"><i class="fa-solid fa-house-chimney text-emerald-500"></i> <span></span></div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- 區塊二：基礎三項健康指標 -->
-                <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
-                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3"><i class="fa-solid fa-heart-pulse text-emerald-500"></i> 基礎醫療預防</h2>
-                    <div class="grid grid-cols-3 gap-3">
-                        <!-- 驅蟲 -->
-                        <label class="admin-field border border-slate-200 rounded-2xl p-3 text-center cursor-pointer transition-all hover:bg-slate-50 flex flex-col items-center gap-1.5 has-[:checked]:border-emerald-500 LindaCheck shadow-xs">
-                            <input type="checkbox" id="chk-parasite" checked class="rounded text-emerald-600 focus:ring-emerald-500">
-                            <span class="text-sm font-semibold text-slate-700">體內外驅蟲</span>
-                        </label>
-                        <!-- 疫苗 -->
-                        <label class="admin-field border border-slate-200 rounded-2xl p-3 text-center cursor-pointer transition-all hover:bg-slate-50 flex flex-col items-center gap-1.5 has-[:checked]:border-emerald-500 LindaCheck shadow-xs">
-                            <input type="checkbox" id="chk-vaccine" checked class="rounded text-emerald-600 focus:ring-emerald-500">
-                            <span class="text-sm font-semibold text-slate-700">核心疫苗</span>
-                        </label>
-                        <!-- 結紮 -->
-                        <label class="admin-field border border-slate-200 rounded-2xl p-3 text-center cursor-pointer transition-all hover:bg-slate-50 flex flex-col items-center gap-1.5 has-[:checked]:border-emerald-500 LindaCheck shadow-xs">
-                            <input type="checkbox" id="chk-ligation" class="rounded text-emerald-600 focus:ring-emerald-500">
-                            <span class="text-sm font-semibold text-slate-700">絕育結紮</span>
-                        </label>
-                    </div>
-                    <!-- 訪客視角呈現基礎健康 -->
-                    <div id="view-basic-health" class="hidden flex flex-wrap gap-2"></div>
-                </section>
+        <!-- ==================== [介面一] 訪客模式：貓咪六宮格卡片牆 ==================== -->
+        <div id="gallery-view" class="space-y-6">
+            <div id="cats-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- 讀取中 -->
+                <div class="col-span-full text-center py-12 text-slate-400 italic">正在從雲端載入貓咪夥伴們...</div>
             </div>
+        </div>
 
-            <!-- 右側：特殊疾病(50種) + 個性(30種) + 日常照片分享區 -->
-            <div class="lg:col-span-7 space-y-6">
-                
-                <!-- 區塊三：特殊疾病篩選區 (精準提供50種) -->
-                <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-                    <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-notes-medical text-amber-500"></i> 特殊健康/疾病狀況檔案 <span class="text-xs text-slate-400 font-normal">(無則免勾)</span></h2>
+        <!-- ==================== [介面二] 貓咪詳細履歷資訊 (點擊卡片後出現) ==================== -->
+        <div id="detail-view" class="hidden space-y-6">
+            <button onclick="showView('gallery-view')" class="text-sm font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5"><i class="fa-solid fa-arrow-left"></i> 返回貓咪大廳</button>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- 詳細左側 -->
+                <div class="lg:col-span-4 space-y-4">
+                    <div class="bg-white border border-slate-200 rounded-3xl overflow-hidden p-4 text-center">
+                        <img id="detail-avatar" src="" class="w-full h-56 object-cover rounded-2xl bg-slate-100 mb-4">
+                        <h2 id="detail-name" class="text-xl font-bold"></h2>
+                        <p id="detail-no" class="text-xs text-slate-400 mt-1"></p>
+                        <div id="detail-status-badge" class="mt-3 inline-block px-3 py-1 rounded-full text-xs font-bold"></div>
                     </div>
-                    
-                    <!-- 50種疾病多選清單 (管理者介面) -->
-                    <div id="disease-container" class="admin-field grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto pr-2 text-sm">
-                        <!-- JavaScript 將自動在此注入 50 種疾病項目 -->
-                    </div>
-
-                    <!-- 訪客唯讀介面 -->
-                    <div id="view-disease-container" class="hidden">
-                        <div id="view-disease-list" class="flex flex-wrap gap-2"></div>
-                        <p id="view-disease-empty" class="text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3 text-center italic hidden"><i class="fa-solid fa-star text-amber-400 mr-1"></i> 這是一隻非常健康的健康寶寶唷！</p>
-                    </div>
-                </section>
-
-                <!-- 區塊四：個性特徵篩選區 (精準提供30種) -->
-                <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-                    <div class="border-b border-slate-100 pb-3 mb-4">
-                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-tags text-indigo-500"></i> 個性特徵特寫 <span class="text-xs text-slate-400 font-normal">(可複選)</span></h2>
-                    </div>
-
-                    <!-- 30種個性多選清單 (管理者介面) -->
-                    <div id="personality-container" class="admin-field flex flex-wrap gap-2 text-sm">
-                        <!-- JavaScript 將自動在此注入 30 種個性特徵 -->
-                    </div>
-
-                    <!-- 訪客唯讀介面 -->
-                    <div id="view-personality-container" class="hidden">
-                        <div id="view-personality-list" class="flex flex-wrap gap-2"></div>
-                    </div>
-                </section>
-
-                <!-- 區塊五：貓咪日常點滴生活分享區 -->
-                <section class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-                    <div class="border-b border-slate-100 pb-3 mb-4">
-                        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2"><i class="fa-solid fa-camera-retro text-pink-500"></i> 貓咪生活日常照分享區</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">記錄毛孩在中途最真實可愛的日常點滴</p>
-                    </div>
-
-                    <!-- 管理者動態新增上傳區塊 -->
-                    <div id="admin-gallery-zone" class="admin-field space-y-4">
-                        <button type="button" onclick="addGalleryItem()" class="w-full py-2.5 border-2 border-dashed border-indigo-300 rounded-xl text-sm font-semibold text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2 cursor-pointer">
-                            <i class="fa-solid fa-plus"></i> 新增一筆生活相簿紀錄
-                        </button>
+                </div>
+                <!-- 詳細右側 -->
+                <div class="lg:col-span-8 space-y-4">
+                    <div class="bg-white border border-slate-200 rounded-3xl p-6 space-y-4">
+                        <h3 class="font-bold border-b border-slate-100 pb-2"><i class="fa-solid fa-notes-medical text-teal-500 mr-1"></i> 健康與醫療紀錄</h3>
+                        <div id="detail-basic-health" class="flex flex-wrap gap-2"></div>
+                        <div id="detail-diseases" class="flex flex-wrap gap-2 pt-2"></div>
                         
-                        <!-- 動態照片卡片容器 -->
-                        <div id="gallery-inputs-list" class="space-y-4"></div>
+                        <h3 class="font-bold border-b border-slate-100 pb-2 pt-4"><i class="fa-solid fa-tags text-indigo-500 mr-1"></i> 特有個性標籤</h3>
+                        <div id="detail-personalities" class="flex flex-wrap gap-2"></div>
                     </div>
-
-                    <!-- 訪客精美瀑布流/卡片展示區 -->
-                    <div id="view-gallery-zone" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- 動態渲染訪客照片牆 -->
-                    </div>
-                </section>
-
+                </div>
             </div>
         </div>
-    </main>
 
-    <!-- 核心運作 JavaScript -->
-    <script>
-        // 1. 精準定義 50 種特殊疾病/健康狀況描述，分為六大類
-        const categories = [
-            { cat: "呼吸與感官", list: ["貓上呼吸道感染(感冒)", "慢性鼻炎", "貓皰疹病毒(FHV-1)", "卡里西病毒(FCV)", "結膜炎", "角膜潰瘍", "中耳炎", "失明/視力受損", "失聰/聽力受損"] },
-            { cat: "傳染與免疫", list: ["貓愛滋(FIV+)", "貓白血病(FeLV+)", "傳染性腹膜炎(FIP已治癒)", "傳染性腹膜炎(FIP治療中)", "貓瘟康復期", "弓形蟲感染"] },
-            { cat: "消化與內分泌", list: ["慢性腎臟病(CKD)", "下泌尿道症候群(FIC)", "尿道結石", "糖尿病", "甲狀腺功能亢進", "慢性胰臟炎", "炎症性腸病(IBD)", "巨結腸症(便秘)"] },
-            { cat: "皮膚與毛髮", list: ["貓癬/黴菌感染", "毛囊炎(黑下巴)", "疥癬蟲感染", "過敏性皮膚炎", "跳蚤過敏性吸吮", "嗜酸性肉芽腫"] },
-            { cat: "口腔與骨骼", list: ["口炎/嚴重牙齦炎", "全口拔牙後續護理", "牙結石/需洗牙", "骨折康復中", "退化性關節炎", "髖關節發育不良", "髕骨外翻", "截肢/肢體殘缺"] },
-            { cat: "其他與高齡護理", list: ["心臟肥大(HCM)", "癲癇歷史", "貧血", "過胖/需體重控制", "過瘦/需加強營養", "隱睪症", "懷孕中/哺乳中", "化療中", "行為性自殘/過度舔毛", "認知障礙(失智症)", "有藥物過敏史", "需定時灌餵食", "需每日定時投藥"] }
-        ];
+        <!-- ==================== [介面三] 找到幸福貓咪分享區 ==================== -->
+        <div id="happy-view" class="hidden space-y-6">
+            <!-- 領養人發文區（僅領養人登入可見） -->
+            <div id="owner-post-box" class="hidden bg-amber-50/50 border border-amber-200 rounded-2xl p-5 space-y-3">
+                <h3 class="text-sm font-bold text-amber-900"><i class="fa-solid fa-feather-pointed mr-1"></i> 新增幸福近況回報</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input type="text" id="post-cat-name" placeholder="貓咪現在的名字" class="sm:col-span-1 px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none">
+                    <input type="file" id="post-photo" accept="image/*" class="sm:col-span-2 text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100">
+                </div>
+                <textarea id="post-text" rows="3" placeholder="和中途媽媽、志工們分享毛孩在家裡的爽爽過生活點滴吧！" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none resize-none"></textarea>
+                <button onclick="submitHappyPost()" class="px-4 py-2 bg-orange-500 text-white rounded-xl text-xs font-bold hover:bg-orange-600 transition-colors">公開發布近況</button>
+            </div>
 
-        // 扁平化50種疾病名稱陣列
-        const diseaseList = [];
-        categories.forEach(c => diseaseList.push(...c.list));
+            <!-- 幸福故事卡片流 -->
+            <div id="happy-stories-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        </div>
 
-        // 2. 精準定義 30 種個性特徵
-        const personalityList = [
-            "親人黏人", "獨立自主", "溫柔沉穩", "活潑好動", "愛撒嬌", 
-            "慢熟害羞", "膽小敏感", "好奇心旺盛", "貪吃鬼", "愛說話/話嘮", 
-            "呼嚕機關槍", "天使貓咪", "精力充沛", "喜歡玩玩具", "喜好高處", 
-            "貓老大性格", "隨和好相處", "愛乾淨", "容易被嚇到", "喜歡曬太陽",
-            "適應力強", "慢郎中", "有點小傲嬌", "喜歡看窗外", "踏踏高手",
-            "親狗傾向", "親貓友善", "適合單貓家庭", "適合多貓家庭", "需要耐心陪伴"
-        ];
+        <!-- ==================== [介面四] 管理員/志工 後台控制面板 ==================== -->
+        <div id="admin-panel-view" class="hidden space-y-6">
+            <div class="bg-white border border-slate-200 rounded-3xl p-6">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-4">
+                    <div>
+                        <h2 class="text-base font-bold">🛠️ 系統管理後台</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">進行中途毛孩建檔與認養人權限發放</p>
+                    </div>
+                    <!-- 管理員限定：飼主管理按鈕 -->
+                    <button id="btn-mgr-owners" onclick="openOwnerManagerModal()" class="hidden px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700">管理飼主帳號</button>
+                </div>
 
-        // 頁面初始化
-        document.addEventListener("DOMContentLoaded", function() {
-            renderDiseaseInputs();
-            renderPersonalityInputs();
-            
-            // 預設建立一組日常相簿欄位
-            addGalleryItem();
-        });
-
-        // 渲染 50 種疾病勾選格
-        function renderDiseaseInputs() {
-            const container = document.getElementById("disease-container");
-            container.innerHTML = "";
-            diseaseList.forEach((disease, index) => {
-                const div = document.createElement("label");
-                div.className = "flex items-start gap-2 p-1.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors";
-                div.innerHTML = `
-                    <input type="checkbox" value="${disease}" class="disease-checkbox mt-0.5 rounded text-amber-500 focus:ring-amber-500">
-                    <span class="text-slate-700 leading-tight">${disease}</span>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        // 渲染 30 種個性勾選格
-        function renderPersonalityInputs() {
-            const container = document.getElementById("personality-container");
-            container.innerHTML = "";
-            personalityList.forEach((trait, index) => {
-                const label = document.createElement("label");
-                label.className = "px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 bg-slate-50 font-medium cursor-pointer transition-all hover:bg-indigo-50 hover:border-indigo-300 has-[:checked]:bg-indigo-600 has-[:checked]:text-white has-[:checked]:border-indigo-600 has-[:checked]:shadow-xs select-none";
-                label.innerHTML = `
-                    <input type="checkbox" value="${trait}" class="personality-checkbox sr-only">
-                    <span>${trait}</span>
-                `;
-                container.appendChild(label);
-            });
-        }
-
-        // 主頭像預覽
-        function previewMainAvatar(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById("main-avatar-preview").src = e.target.result;
-                    document.getElementById("main-avatar-preview").classList.remove("hidden");
-                    document.getElementById("main-avatar-placeholder").classList.add("hidden");
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        // 動態新增日常照表單欄位
-        let galleryCounter = 0;
-        function addGalleryItem() {
-            galleryCounter++;
-            const listContainer = document.getElementById("gallery-inputs-list");
-            
-            const card = document.createElement("div");
-            card.id = `gallery-item-${galleryCounter}`;
-            card.className = "gallery-input-card bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 relative";
-            card.innerHTML = `
-                <button type="button" onclick="removeGalleryItem(${galleryCounter})" class="absolute top-3 right-3 text-slate-400 hover:text-rose-500 text-sm transition-colors cursor-pointer">
-                    <i class="fa-regular fa-trash-can"></i> 刪除
-                </button>
-                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                    <div class="sm:col-span-4">
-                        <div class="relative border-2 border-dashed border-slate-300 rounded-xl h-28 bg-white flex flex-col justify-center items-center overflow-hidden group hover:border-pink-400 transition-colors">
-                            <img id="gallery-preview-${galleryCounter}" class="w-full h-full object-cover hidden" />
-                            <div id="gallery-holder-${galleryCounter}" class="text-center p-2">
-                                <i class="fa-solid fa-images text-xl text-slate-400 group-hover:text-pink-500"></i>
-                                <span class="block text-xs font-medium text-slate-500 mt-1">選取相片</span>
-                            </div>
-                            <input type="file" accept="image/*" onchange="previewGalleryImage(this, ${galleryCounter})" class="file-input-hide gallery-img-file">
+                <!-- 填寫/編輯貓咪大表單 -->
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    <!-- 基本資料 -->
+                    <div class="md:col-span-4 space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold mb-1">貓咪檔案編號 (必填，不可重複)</label>
+                            <input type="text" id="form-cat-no" placeholder="例如: CAT-052" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold mb-1">貓咪名字</label>
+                            <input type="text" id="form-cat-name" placeholder="請輸入名字" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold mb-1">性別</label>
+                            <select id="form-cat-gender" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                                <option value="公">公 (帥哥)</option>
+                                <option value="母">母 (美女)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold mb-1">中途狀態分區</label>
+                            <select id="form-cat-status" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                                <option value="等家中">等家中</option>
+                                <option value="長期租客區">長期租客區</option>
+                                <option value="已送養">已送養</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold mb-1">大頭照圖片</label>
+                            <input type="file" id="form-cat-avatar" accept="image/*" class="w-full text-xs">
                         </div>
                     </div>
-                    <div class="sm:col-span-8 flex flex-col justify-between">
+
+                    <!-- 疾病(50種)與個性(30種) -->
+                    <div class="md:col-span-8 space-y-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">日常點滴敘述</label>
-                            <textarea rows="3" placeholder="例如：咪咪今天第一次主動翻肚子討摸摸，呼嚕聲超級大聲，看來已經完全適應這裡的生活囉！" class="gallery-text-desc w-full px-3 py-1.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 resize-none"></textarea>
+                            <label class="block text-xs font-bold mb-1 text-teal-700">基礎防護醫療 (多選)</label>
+                            <div class="flex gap-4 text-xs">
+                                <label class="flex items-center gap-1"><input type="checkbox" id="form-med-parasite"> 體體外驅蟲</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" id="form-med-vaccine"> 核心疫苗</label>
+                                <label class="flex items-center gap-1"><input type="checkbox" id="form-med-ligation"> 絕育結紮</label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold mb-1 text-amber-700">特殊健康/疾病篩選 (可複選，共50種精選)</label>
+                            <div id="form-disease-list" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-32 overflow-y-auto border border-slate-200 p-2 rounded-xl text-[11px]"></div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold mb-1 text-indigo-700">個性特徵標籤 (可複選，共30種精選)</label>
+                            <div id="form-personality-list" class="flex flex-wrap gap-1 max-h-24 overflow-y-auto border border-slate-200 p-2 rounded-xl text-[11px]"></div>
                         </div>
                     </div>
                 </div>
-            `;
-            listContainer.appendChild(card);
-        }
 
-        function removeGalleryItem(id) {
-            const item = document.getElementById(`gallery-item-${id}`);
-            if (item) item.remove();
-        }
+                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button onclick="clearCatForm()" class="px-4 py-2 border border-slate-200 rounded-xl text-xs">重設清空</button>
+                    <button onclick="saveCatData()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700">儲存貓咪檔案至雲端</button>
+                </div>
+            </div>
+        </div>
 
-        // 日常照預覽功能
-        function previewGalleryImage(input, id) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById(`gallery-preview-${id}`).src = e.target.result;
-                    document.getElementById(`gallery-preview-${id}`).classList.remove("hidden");
-                    document.getElementById(`gallery-holder-${id}`).classList.add("hidden");
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
+    </main>
 
-        // 核心切換模式：管理者（輸入） V.S. 訪客（唯讀美化展示）
-        function switchMode(mode) {
-            const btnAdmin = document.getElementById("btn-admin");
-            const btnVisitor = document.getElementById("btn-visitor");
-            const modeTip = document.getElementById("mode-tip");
+    <!-- ==================== 彈出式視窗聚集區 ==================== -->
+    <!-- 後台登入彈窗 -->
+    <div id="backend-login-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative">
+            <h3 class="font-bold text-center">工作人員後台驗證</h3>
+            <input type="password" id="backend-pwd" placeholder="請輸入驗證代碼" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-center focus:outline-none">
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="submitBackendLogin('admin')" class="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">管理員登入</button>
+                <button onclick="submitBackendLogin('volunteer')" class="w-full py-2 bg-orange-500 text-white rounded-xl text-xs font-bold">志工登入</button>
+            </div>
+            <button onclick="closeModal('backend-login-modal')" class="absolute top-2 right-4 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+        </div>
+    </div>
+
+    <!-- 飼主登入彈窗 -->
+    <div id="owner-login-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative">
+            <h3 class="font-bold text-center">幸福家長專屬登入</h3>
+            <input type="password" id="owner-pwd" placeholder="請輸入管理員核發的專屬金鑰" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-center focus:outline-none">
+            <button onclick="submitOwnerLogin()" class="w-full py-2 bg-orange-500 text-white rounded-xl text-xs font-bold">驗證登入</button>
+            <button onclick="closeModal('owner-login-modal')" class="absolute top-2 right-4 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+        </div>
+    </div>
+
+    <!-- 管理員專用：飼主帳號發放視窗 -->
+    <div id="owner-manager-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 relative max-h-[85vh] overflow-y-auto">
+            <h3 class="font-bold text-sm border-b border-slate-100 pb-2">🔑 飼主帳號金鑰管理面板</h3>
+            <!-- 新增表單 -->
+            <div class="bg-slate-50 p-3 rounded-xl space-y-2 text-xs">
+                <p class="font-bold text-slate-600">建立新配對帳號</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="new-owner-name" placeholder="家長稱呼 (如：陳小姐)" class="p-2 border bg-white rounded-lg">
+                    <input type="text" id="new-owner-pwd" placeholder="自訂專屬登入密碼" class="p-2 border bg-white rounded-lg">
+                </div>
+                <select id="new-owner-cat" class="w-full p-2 border bg-white rounded-lg"></select>
+                <button onclick="createNewOwnerAccount()" class="w-full py-1.5 bg-indigo-600 text-white font-bold rounded-lg mt-1">新增並儲存帳號</button>
+            </div>
+            <!-- 清單列表 -->
+            <div class="space-y-1.5">
+                <p class="text-xs font-bold text-slate-500">現存核發金鑰清單</p>
+                <div id="owner-accounts-list" class="text-xs space-y-1 max-h-40 overflow-y-auto"></div>
+            </div>
+            <button onclick="closeModal('owner-manager-modal')" class="absolute top-2 right-4 text-slate-400 hover:text-slate-600 text-sm">✕</button>
+        </div>
+    </div>
+
+    <!-- ==================== 核心 JavaScript 邏輯控制 ==================== -->
+    <script>
+        // 帶入你的 Supabase 金鑰配置
+        const SUBAPASE_URL = "https://raupmwembebxoxzmdppe.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_84WIu59Amgf_k0GVIJZ4Ow_ivEBpZRR";
+        const _supabase = supabase.createClient(SUBAPASE_URL, SUPABASE_KEY);
+
+        // 系統常數：50種疾病與30種個性定義
+        const diseasePool = [
+            "貓上呼吸道感染(感冒)", "慢性鼻炎", "貓皰疹病毒", "卡里西病毒", "結膜炎", "角膜潰瘍", "中耳炎", "失明/視力受損", "失聰/聽力受損",
+            "貓愛滋(FIV+)", "貓白血病(FeLV+)", "腹膜炎(已治癒)", "腹膜炎(治療中)", "貓瘟康復期", "弓形蟲感染", "慢性腎臟病(CKD)", "下泌尿道症候群",
+            "尿道結石", "糖尿病", "甲狀腺亢進", "慢性胰臟炎", "炎症性腸病", "巨結腸症", "貓癬/黴菌", "毛囊炎(黑下巴)", "疥癬蟲感染", "過敏性皮膚炎",
+            "跳蚤過敏", "嗜酸性肉芽腫", "口炎/严重牙齦炎", "全口拔牙後續", "牙結石", "骨折康復中", "退化性關節炎", "髖關節發育不良", "髕骨外翻",
+            "截肢/肢體殘缺", "心臟肥大(HCM)", "癲癇歷史", "貧血", "過胖體重控制", "過瘦營養加強", "隱睪症", "懷孕/哺乳中", "化療中", "行為性過度舔毛",
+            "認知障礙(失智)", "有藥物過敏史", "需定時灌食", "需每日定時投藥"
+        ];
+        const personalityPool = [
+            "親人黏人", "獨立自主", "溫柔沉穩", "活潑好動", "愛撒嬌", "慢熟害羞", "膽小敏感", "好奇心旺盛", "貪吃鬼", "愛說話/話嘮", 
+            "呼嚕機關槍", "天使貓咪", "精力充沛", "喜歡玩玩具", "喜好高處", "貓老大性格", "隨和好相處", "愛乾淨", "容易被嚇到", "喜歡曬太陽",
+            "適應力強", "慢郎中", "有點小傲嬌", "喜歡看窗外", "踏踏高手", "親狗傾向", "親貓友善", "適合單貓家庭", "適合多貓家庭", "需要耐心陪伴"
+        ];
+
+        // 全域狀態管理
+        let currentRole = 'visitor'; // visitor, admin, volunteer, owner
+        let currentOwnerData = null; // 儲存登入成功的飼主資料
+
+        // 初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            renderFormCheckboxPools();
+            loadCatsGrid();
+            loadHappyStories();
+        });
+
+        // 渲染後台表單的核取方塊
+        function renderFormCheckboxPools() {
+            const dContainer = document.getElementById("form-disease-list");
+            dContainer.innerHTML = diseasePool.map(d => `<label class="flex items-center gap-1 truncate"><input type="checkbox" value="${d}" class="cat-disease-chk"> ${d}</label>`).join('');
             
-            // 找出所有填寫、勾選欄位
-            const adminFields = document.querySelectorAll(".admin-field");
-            
-            if (mode === 'visitor') {
-                // 1. 切換按電樣式
-                btnAdmin.className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-600 hover:text-slate-900 flex items-center gap-2";
-                btnVisitor.className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center gap-2";
-                
-                modeTip.className = "mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl flex items-center gap-3 text-sm";
-                modeTip.innerHTML = `<i class="fa-solid fa-circle-check text-base shrink-0"></i> <span><strong>當前為【訪客模式】：</strong> 網頁已進行最優化排版，未勾選的疾病、特徵皆已自動隱藏，呈現最精準乾淨的畫面！</span>`;
-
-                // 2. 隱藏編輯輸入元件
-                adminFields.forEach(f => f.classList.add("hidden"));
-
-                // 3. 處理訪客唯讀資料轉單同步
-                syncDataToVisitorView();
-
-            } else {
-                // 切回管理者模式
-                btnAdmin.className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center gap-2";
-                btnVisitor.className = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-slate-600 hover:text-slate-900 flex items-center gap-2";
-                
-                modeTip.className = "mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3 text-sm";
-                modeTip.innerHTML = `<i class="fa-solid fa-circle-info text-base shrink-0"></i> <span><strong>當前為【管理者模式】：</strong> 您可以自由填寫、勾選以下欄位並上傳生活照。點擊上方可切換為【訪客模式】觀看最終呈現效果（未勾選項目會自動隱藏）。</span>`;
-
-                // 顯示編輯輸入元件
-                adminFields.forEach(f => f.classList.remove("hidden"));
-                
-                // 隱藏訪客唯讀專用容器
-                document.getElementById("view-cat-name").classList.add("hidden");
-                document.getElementById("view-gender").classList.add("hidden");
-                document.getElementById("view-date-join").classList.add("hidden");
-                document.getElementById("view-date-home").classList.add("hidden");
-                document.getElementById("view-basic-health").classList.add("hidden");
-                document.getElementById("view-disease-container").classList.add("hidden");
-                document.getElementById("view-personality-container").classList.add("hidden");
-                document.getElementById("view-gallery-zone").classList.add("hidden");
-            }
+            const pContainer = document.getElementById("form-personality-list");
+            pContainer.innerHTML = personalityPool.map(p => `<label class="inline-flex items-center gap-1 border border-slate-200 px-2 py-0.5 rounded-md bg-slate-50"><input type="checkbox" value="${p}" class="cat-personality-chk"> ${p}</label>`).join('');
         }
 
-        // 將輸入的資料同步到訪客唯讀畫面（核心邏輯：只顯示被勾選的）
-        function syncDataToVisitorView() {
-            // 1. 同步名字
-            const name = document.getElementById("cat-name").value || "未命名";
-            const viewName = document.getElementById("view-cat-name");
-            viewName.textContent = name;
-            viewName.classList.remove("hidden");
+        // 彈窗開關控制
+        function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+        function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
 
-            // 2. 同步性別標籤
-            const genderVal = document.querySelector('input[name="gender"]:checked').value;
-            const viewGender = document.getElementById("view-gender");
-            if(genderVal === '公') {
-                viewGender.className = "inline-block text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-bold";
-                viewGender.innerHTML = `<i class="fa-solid fa-mars"></i> 帥哥 (${genderVal})`;
-            } else {
-                viewGender.className = "inline-block text-xs bg-pink-50 text-pink-600 px-2.5 py-1 rounded-full font-bold";
-                viewGender.innerHTML = `<i class="fa-solid fa-venus"></i> 美女 (${genderVal})`;
-            }
-            viewGender.classList.remove("hidden");
-
-            // 3. 同步日期進出時間
-            const dateJoin = document.getElementById("date-join").value;
-            const viewJoin = document.getElementById("view-date-join");
-            if(dateJoin) {
-                viewJoin.querySelector("span").textContent = `入所日期：${dateJoin}`;
-                viewJoin.classList.remove("hidden");
-            }
-
-            const dateHome = document.getElementById("date-home").value;
-            const viewHome = document.getElementById("view-date-home");
-            if(dateHome) {
-                viewHome.querySelector("span").textContent = `恭喜畢業：${dateHome}`;
-                viewHome.classList.remove("hidden");
-            } else {
-                viewHome.querySelector("span").textContent = `等待一個家...`;
-                viewHome.classList.remove("hidden");
-            }
-
-            // 4. 同步基礎醫療預防
-            const basicHealth = document.getElementById("view-basic-health");
-            basicHealth.innerHTML = "";
-            const healthChecks = [
-                { id: "chk-parasite", label: "已體內外驅蟲", icon: "fa-bug-slash", color: "bg-teal-50 text-teal-700 border-teal-200" },
-                { id: "chk-vaccine", label: "已施打核心疫苗", icon: "fa-syringe", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-                { id: "chk-ligation", label: "已完成絕育手術", icon: "fa-scissors", color: "bg-sky-50 text-sky-700 border-sky-200" }
-            ];
-            healthChecks.forEach(item => {
-                const isChecked = document.getElementById(item.id).checked;
-                // 不管有沒有勾選，在訪客端都精美呈現狀態
-                const badge = document.createElement("span");
-                badge.className = `text-xs border px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 ${isChecked ? item.color : 'bg-slate-100 text-slate-400 border-slate-200 line-through'}`;
-                badge.innerHTML = `<i class="fa-solid ${isChecked ? item.icon : 'fa-circle-xmark'}"></i> ${item.label}`;
-                basicHealth.appendChild(badge);
+        // 路由切換控制
+        function showView(viewId) {
+            ['gallery-view', 'detail-view', 'happy-view', 'admin-panel-view'].forEach(id => {
+                document.getElementById(id).classList.add("hidden");
             });
-            basicHealth.classList.remove("hidden");
+            document.getElementById(viewId).classList.remove("hidden");
+        }
 
-            // 5. 【關鍵需求】智慧篩選：只顯示被勾選的特殊疾病
-            const viewDiseaseContainer = document.getElementById("view-disease-container");
-            const viewDiseaseList = document.getElementById("view-disease-list");
-            const viewDiseaseEmpty = document.getElementById("view-disease-empty");
-            
-            viewDiseaseList.innerHTML = "";
-            viewDiseaseContainer.classList.remove("hidden");
-            
-            const selectedDiseases = Array.from(document.querySelectorAll(".disease-checkbox:checked")).map(el => el.value);
-            
-            if(selectedDiseases.length === 0) {
-                viewDiseaseEmpty.classList.remove("hidden");
+        // 大廳與幸福分享區 Tab 切換
+        function switchMainTab(tab) {
+            const tGallery = document.getElementById("tab-gallery");
+            const tHappy = document.getElementById("tab-happy");
+            if (tab === 'gallery') {
+                tGallery.className = "pb-3 border-b-2 border-orange-500 text-orange-600 font-bold";
+                tHappy.className = "pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800";
+                if(currentRole === 'admin' || currentRole === 'volunteer') { showView('admin-panel-view'); } 
+                else { showView('gallery-view'); }
             } else {
-                viewDiseaseEmpty.classList.add("hidden");
-                selectedDiseases.forEach(d => {
-                    const dBadge = document.createElement("span");
-                    dBadge.className = "text-xs bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1";
-                    dBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> ${d}`;
-                    viewDiseaseList.appendChild(dBadge);
-                });
+                tHappy.className = "pb-3 border-b-2 border-orange-500 text-orange-600 font-bold";
+                tGallery.className = "pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800";
+                showView('happy-view');
+            }
+        }
+
+        // 後台驗證登入
+        function submitBackendLogin(targetRole) {
+            const pwd = document.getElementById("backend-pwd").value;
+            if (targetRole === 'admin' && pwd === '9742') {
+                currentRole = 'admin';
+                document.getElementById("btn-mgr-owners").classList.remove("hidden");
+                enterStaffMode();
+            } else if (targetRole === 'volunteer' && pwd === '888') {
+                currentRole = 'volunteer';
+                document.getElementById("btn-mgr-owners").classList.add("hidden");
+                enterStaffMode();
+            } else {
+                alert("驗證密碼錯誤！");
+            }
+        }
+
+        function enterStaffMode() {
+            closeModal('backend-login-modal');
+            document.getElementById("backend-pwd").value = "";
+            document.getElementById("current-role-badge").classList.remove("hidden");
+            document.getElementById("role-text").textContent = currentRole === 'admin' ? "超級管理員" : "志工夥伴";
+            switchMainTab('gallery');
+        }
+
+        // 飼主登入驗證
+        async function submitOwnerLogin() {
+            const pwd = document.getElementById("owner-pwd").value;
+            const { data, error } = await _supabase.from('owners').select('*').eq('login_password', pwd).maybeSingle();
+            
+            if (error || !data) {
+                alert("找不到相符的飼主金鑰！");
+                return;
+            }
+            currentRole = 'owner';
+            currentOwnerData = data;
+            closeModal('owner-login-modal');
+            document.getElementById("owner-pwd").value = "";
+            document.getElementById("current-role-badge").classList.remove("hidden");
+            document.getElementById("role-text").textContent = `幸福家長 (${data.owner_name})`;
+            document.getElementById("owner-post-box").classList.remove("hidden");
+            switchMainTab('happy');
+        }
+
+        function logoutRole() {
+            currentRole = 'visitor';
+            currentOwnerData = null;
+            document.getElementById("current-role-badge").classList.add("hidden");
+            document.getElementById("owner-post-box").classList.add("hidden");
+            switchMainTab('gallery');
+            loadCatsGrid();
+        }
+
+        // 讀取大廳貓咪卡片牆（串接 Supabase）
+        async function loadCatsGrid() {
+            const container = document.getElementById("cats-grid");
+            const { data: cats, error } = await _supabase.from('cats').select('*').order('created_at', { ascending: false });
+            
+            if (error || !cats || cats.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-400">目前中途空蕩蕩，還沒有貓咪入住。</div>`;
+                return;
             }
 
-            // 6. 【關鍵需求】智慧篩選：只顯示被勾選的個性標籤
-            const viewPersonalityContainer = document.getElementById("view-personality-container");
-            const viewPersonalityList = document.getElementById("view-personality-list");
-            
-            viewPersonalityList.innerHTML = "";
-            viewPersonalityContainer.classList.remove("hidden");
-            
-            const selectedTraits = Array.from(document.querySelectorAll(".personality-checkbox:checked")).map(el => el.value);
-            
-            if(selectedTraits.length === 0) {
-                viewPersonalityList.innerHTML = `<p class="text-xs text-slate-400 italic">正在用心發掘獨特個性中...</p>`;
-            } else {
-                selectedTraits.forEach(t => {
-                    const tBadge = document.createElement("span");
-                    tBadge.className = "text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-xl font-semibold shadow-xs";
-                    tBadge.textContent = `# ${t}`;
-                    viewPersonalityList.appendChild(tBadge);
-                });
-            }
-
-            // 7. 同步與渲染日常照片分享專區
-            const viewGalleryZone = document.getElementById("view-gallery-zone");
-            viewGalleryZone.innerHTML = "";
-            viewGalleryZone.classList.remove("hidden");
-
-            const inputCards = document.querySelectorAll(".gallery-input-card");
-            let hasValidPhotos = false;
-
-            inputCards.forEach(card => {
-                const imgFileEl = card.querySelector(".gallery-img-file");
-                const descText = card.querySelector(".gallery-text-desc").value.trim();
+            container.innerHTML = cats.map(cat => {
+                const isAdopted = cat.status === '已送養';
+                const cardBg = isAdopted ? 'bg-slate-200 grayscale opacity-75' : 'bg-white hover:-translate-y-1 hover:shadow-md';
+                const genderIcon = cat.gender === '公' ? '<i class="fa-solid fa-mars text-blue-500"></i>' : '<i class="fa-solid fa-venus text-pink-500"></i>';
+                const avatar = cat.avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="%23cbd5e1"><path d="M12 2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10z"/></svg>';
                 
-                // 取得預覽圖的原生 Base64 或記憶體路徑
-                const imgPreviewEl = card.querySelector("img");
-                const imgSrc = imgPreviewEl && !imgPreviewEl.classList.contains("hidden") ? imgPreviewEl.src : "";
-
-                if (imgSrc || descText) {
-                    hasValidPhotos = true;
-                    const galleryCard = document.createElement("div");
-                    galleryCard.className = "bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-xs transition-transform duration-200 hover:-translate-y-0.5";
-                    
-                    // 如果有照片就顯示，沒上傳照片則用好看的暖色貓咪貓掌預設底圖代替
-                    const displayImg = imgSrc ? imgSrc : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="%23f1f5f9"><path d="M12 14c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0-12C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15.92c-.33.05-.66.08-1 .08s-.67-.03-1-.08v-1.12c.33.05.66.08 1 .08s.67-.03 1-.08v1.12z"/></svg>';
-
-                    galleryCard.innerHTML = `
-                        <div class="h-44 bg-slate-200 relative overflow-hidden flex items-center justify-center">
-                            <img src="${displayImg}" class="w-full h-full object-cover">
-                            ${!imgSrc ? '<div class="absolute inset-0 flex items-center justify-center text-slate-400 text-xs font-medium"><i class="fa-solid fa-paw mr-1"></i> 生活動態觀察中</div>' : ''}
+                return `
+                    <div onclick="viewCatDetail('${cat.id}')" class="${cardBg} border border-slate-200 rounded-2xl overflow-hidden cursor-pointer transition-all relative">
+                        ${isAdopted ? '<span class="absolute top-3 right-3 bg-slate-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-md z-10"><i class="fa-solid fa-house-chimney text-emerald-400 mr-1"></i>已找到家</span>' : `<span class="absolute top-3 right-3 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md z-10">${cat.status}</span>`}
+                        <div class="h-48 bg-slate-100 overflow-hidden">
+                            <img src="${avatar}" class="w-full h-full object-cover">
                         </div>
-                        <div class="p-4 bg-white">
-                            <p class="text-sm text-slate-700 leading-relaxed font-normal">${descText ? descText : '這天小貓咪開心地探索中途家園，雖然沒有留下文字文字，但快樂的心情溢於言表！'}</p>
-                            <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                                <span><i class="fa-solid fa-heart text-pink-400"></i> 日常紀錄點滴</span>
-                                <span>幸福中途</span>
+                        <div class="p-4 flex justify-between items-center bg-white/90">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">${cat.name}</h3>
+                                <p class="text-[10px] text-slate-400 mt-0.5">編號：${cat.cat_no}</p>
                             </div>
+                            <span class="text-sm bg-slate-50 p-1.5 rounded-lg">${genderIcon}</span>
                         </div>
-                    `;
-                    viewGalleryZone.appendChild(galleryCard);
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 查看貓咪單獨詳細頁面
+        async function viewCatDetail(catId) {
+            const { data: cat, error } = await _supabase.from('cats').select('*').eq('id', catId).maybeSingle();
+            if (error || !cat) return;
+
+            document.getElementById("detail-avatar").src = cat.avatar_url || '';
+            document.getElementById("detail-name").textContent = cat.name;
+            document.getElementById("detail-no").textContent = `官方建檔編號：${cat.cat_no} | 入所時間：${cat.join_date || '暫無資訊'}`;
+            
+            const badge = document.getElementById("detail-status-badge");
+            badge.textContent = cat.status;
+            badge.className = cat.status === '已送養' ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800";
+
+            // 基礎醫療
+            const hb = cat.health_basic || {};
+            document.getElementById("detail-basic-health").innerHTML = `
+                <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${hb.parasite ? 'bg-teal-50 border-teal-200 text-teal-700' : 'bg-slate-100 text-slate-400 line-through'}">體內外驅蟲</span>
+                <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${hb.vaccine ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400 line-through'}">核心疫苗</span>
+                <span class="px-2.5 py-1 rounded-lg text-xs font-medium border ${hb.ligation ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-slate-100 text-slate-400 line-through'}">絕育結紮</span>
+            `;
+
+            // 疾病（智慧過濾空欄位）
+            const disContainer = document.getElementById("detail-diseases");
+            if(cat.diseases && cat.diseases.length > 0) {
+                disContainer.innerHTML = cat.diseases.map(d => `<span class="bg-amber-50 border border-amber-200 text-amber-800 text-[11px] px-2 py-1 rounded-md"><i class="fa-solid fa-triangle-exclamation mr-1"></i>${d}</span>`).join('');
+            } else {
+                disContainer.innerHTML = `<span class="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-xl"><i class="fa-solid fa-star text-amber-400 mr-1"></i>健康滿分的特優寶寶，無特殊疾病！</span>`;
+            }
+
+            // 個性
+            const perContainer = document.getElementById("detail-personalities");
+            if(cat.personalities && cat.personalities.length > 0) {
+                perContainer.innerHTML = cat.personalities.map(p => `<span class="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] px-2.5 py-1 rounded-full font-medium"># ${p}</span>`).join('');
+            } else {
+                perContainer.innerHTML = `<span class="text-xs text-slate-400">尚在發掘獨特個性中...</span>`;
+            }
+
+            showView('detail-view');
+        }
+
+        // 後台：儲存/建立貓咪資料（含圖片轉化編碼或公用路徑）
+        async function saveCatData() {
+            const catNo = document.getElementById("form-cat-no").value.trim();
+            const name = document.getElementById("form-cat-name").value.trim();
+            const gender = document.getElementById("form-cat-gender").value;
+            const status = document.getElementById("form-cat-status").value;
+            
+            if(!catNo || !name) { alert("請填寫檔案編號與貓咪名字！"); return; }
+
+            // 檢查志工權限防禦
+            if (currentRole === 'volunteer' && status === '已送養') {
+                alert("權限不足：志工夥伴不能隨意變更送養與狀態權限欄位。");
+                return;
+            }
+
+            // 讀取複選勾選框數據
+            const health_basic = {
+                parasite: document.getElementById("form-med-parasite").checked,
+                vaccine: document.getElementById("form-med-vaccine").checked,
+                ligation: document.getElementById("form-med-ligation").checked
+            };
+
+            const diseases = Array.from(document.querySelectorAll(".cat-disease-chk:checked")).map(el => el.value);
+            const personalities = Array.from(document.querySelectorAll(".cat-personality-chk:checked")).map(el => el.value);
+
+            // 照片上傳處理 (利用 Supabase Storage，若未傳則維持空)
+            let avatar_url = null;
+            const fileInput = document.getElementById("form-cat-avatar");
+            if(fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `avatar-${Date.now()}.${fileExt}`;
+                
+                const { data: uploadData, error: upError } = await _supabase.storage.from('cat-photos').upload(fileName, file);
+                if(!upError) {
+                    avatar_url = `${SUBAPASE_URL}/storage/v1/object/public/cat-photos/${fileName}`;
                 }
+            }
+
+            // 寫入 Supabase 資料庫
+            const payload = { cat_no: catNo, name, gender, status, health_basic, diseases, personalities };
+            if(avatar_url) payload.avatar_url = avatar_url;
+
+            const { error } = await _supabase.from('cats').upsert(payload, { onConflict: 'cat_no' });
+
+            if(error) {
+                alert("儲存失敗，可能編號重複或儲存格異常：" + error.message);
+            } else {
+                alert("🎉 貓咪檔案成功同步至雲端資料庫！");
+                clearCatForm();
+                loadCatsGrid();
+            }
+        }
+
+        function clearCatForm() {
+            document.getElementById("form-cat-no").value = "";
+            document.getElementById("form-cat-name").value = "";
+            document.getElementById("form-cat-avatar").value = "";
+            document.getElementById("form-med-parasite").checked = false;
+            document.getElementById("form-med-vaccine").checked = false;
+            document.getElementById("form-med-ligation").checked = false;
+            document.querySelectorAll(".cat-disease-chk, .cat-personality-chk").forEach(el => el.checked = false);
+        }
+
+        // 管理員：管理飼主金鑰專區
+        async function openOwnerManagerModal() {
+            openModal('owner-manager-modal');
+            const selectEl = document.getElementById("new-owner-cat");
+            const { data: cats } = await _supabase.from('cats').select('id, name');
+            selectEl.innerHTML = (cats || []).map(c => `<option value="${c.id}">領養家庭配合貓咪：${c.name}</option>`).join('');
+            
+            // 載入目前所有飼主帳號
+            const listEl = document.getElementById("owner-accounts-list");
+            const { data: owners } = await _supabase.from('owners').select('*');
+            listEl.innerHTML = (owners || []).map(o => `
+                <div class="flex justify-between bg-slate-50 p-2 rounded-lg mb-1 border">
+                    <span>👨‍👦 <strong>${o.owner_name}</strong> (金鑰: ${o.login_password})</span>
+                    <button onclick="deleteOwnerAccount('${o.id}')" class="text-red-500 hover:underline">註銷</button>
+                </div>
+            `).join('');
+        }
+
+        async function createNewOwnerAccount() {
+            const owner_name = document.getElementById("new-owner-name").value.trim();
+            const login_password = document.getElementById("new-owner-pwd").value.trim();
+            const cat_id = document.getElementById("new-owner-cat").value;
+
+            if(!owner_name || !login_password) return;
+            await _supabase.from('owners').insert({ owner_name, login_password, cat_id });
+            openOwnerManagerModal();
+        }
+
+        async function deleteOwnerAccount(id) {
+            if(confirm("確定要註銷此認養人金鑰嗎？")) {
+                await _supabase.from('owners').delete().eq('id', id);
+                openOwnerManagerModal();
+            }
+        }
+
+        // 飼主端：發表幸福點滴紀錄
+        async function submitHappyPost() {
+            const cat_name = document.getElementById("post-cat-name").value.trim();
+            const story_text = document.getElementById("post-text").value.trim();
+            const fileInput = document.getElementById("post-photo");
+
+            if(!cat_name || !story_text) { alert("請填寫貓咪名字與近況內文！"); return; }
+
+            let photo_url = null;
+            if(fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const fileExt = file.name.split('.').pop();
+                const fileName = `happy-${Date.now()}.${fileExt}`;
+                const { error: upError } = await _supabase.storage.from('cat-photos').upload(fileName, file);
+                if(!upError) photo_url = `${SUBAPASE_URL}/storage/v1/object/public/cat-photos/${fileName}`;
+            }
+
+            await _supabase.from('happy_stories').insert({
+                owner_id: currentOwnerData.id,
+                cat_name,
+                story_text,
+                photo_url
             });
 
-            if (!hasValidPhotos) {
-                viewGalleryZone.className = "block text-center p-8 border border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm italic";
-                viewGalleryZone.innerHTML = `<i class="fa-solid fa-camera text-2xl mb-1.5 block"></i> 還沒有上傳生活照，持續記錄中！`;
-            } else {
-                viewGalleryZone.className = "grid grid-cols-1 sm:grid-cols-2 gap-4";
+            document.getElementById("post-cat-name").value = "";
+            document.getElementById("post-text").value = "";
+            document.getElementById("post-photo").value = "";
+            alert("幸福貼文已成功發布！");
+            loadHappyStories();
+        }
+
+        // 讀取幸福貼文流
+        async function loadHappyStories() {
+            const listEl = document.getElementById("happy-stories-list");
+            const { data: stories } = await _supabase.from('happy_stories').select('*').order('created_at', { ascending: false });
+
+            if(!stories || stories.length === 0) {
+                listEl.innerHTML = `<div class="col-span-full text-center py-8 text-slate-400 italic">目前還沒有家長上傳近況，期待大家的分享！</div>`;
+                return;
             }
+
+            listEl.innerHTML = stories.map(s => `
+                <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    ${s.photo_url ? `<img src="${s.photo_url}" class="w-full h-48 object-cover bg-slate-100">` : ''}
+                    <div class="p-4 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold">❤️ 畢業生：${s.cat_name}</span>
+                            <span class="text-[10px] text-slate-400">${new Date(s.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p class="text-xs text-slate-600 leading-relaxed">${s.story_text}</p>
+                    </div>
+                </div>
+            `).join('');
         }
     </script>
 </body>
